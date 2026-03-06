@@ -12,8 +12,8 @@
 </head>
 <body class="min-h-screen">
   <main class="mx-auto max-w-xl px-6 py-10">
-    <h1 class="text-3xl font-bold text-white">You were invited as a warden</h1>
-    <p class="mt-3 text-slate-300">
+    <h1 id="pageTitle" class="text-3xl font-bold text-white">You were invited as a warden</h1>
+    <p id="pageSubtitle" class="mt-3 text-slate-300">
       Open this invite in the Echomitter app to review and accept the request.
     </p>
 
@@ -60,12 +60,17 @@
       const copyStatus = document.getElementById('copyStatus');
       const shareButton = document.getElementById('shareLink');
       const shareStatus = document.getElementById('shareStatus');
+      const pageTitle = document.getElementById('pageTitle');
+      const pageSubtitle = document.getElementById('pageSubtitle');
 
       openLink.setAttribute('href', deepLink);
       deepLinkText.textContent = deepLink;
 
       if (!token) {
+        pageTitle.textContent = 'Invalid invite link';
+        pageSubtitle.textContent = 'This invite link is incomplete or expired. Ask the owner to generate a new invite.';
         copyStatus.textContent = 'Missing invite token in URL.';
+        shareStatus.textContent = 'Missing invite token in URL.';
       }
 
       copyButton.addEventListener('click', async () => {
