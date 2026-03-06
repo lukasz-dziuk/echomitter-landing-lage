@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
   <title>Echomitter - Warden Invite</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -25,9 +26,15 @@
     </div>
 
     <div class="mt-6 rounded-xl border border-slate-700 bg-slate-900 p-5">
-      <p class="text-sm text-slate-400">Open on your phone with QR</p>
-      <img id="qrImage" class="mt-3 h-56 w-56 rounded-lg bg-white p-2" alt="Invite QR" />
+      <p class="text-sm text-slate-400">Open on your phone</p>
+      <p class="mt-2 text-xs text-slate-500">
+        For security, this page does not send invite tokens to external QR services.
+      </p>
       <p class="mt-2 break-all text-xs text-slate-500" id="deeplinkText"></p>
+      <button id="shareLink" class="mt-3 rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800">
+        Share link
+      </button>
+      <p id="shareStatus" class="mt-2 text-xs text-slate-500"></p>
     </div>
 
     <div class="mt-6 rounded-xl border border-slate-700 bg-slate-900 p-5">
@@ -48,16 +55,18 @@
         : 'echomitter://warden/invite';
 
       const openLink = document.getElementById('openAppLink');
-      const qrImage = document.getElementById('qrImage');
       const deepLinkText = document.getElementById('deeplinkText');
       const copyButton = document.getElementById('copyLink');
       const copyStatus = document.getElementById('copyStatus');
+      const shareButton = document.getElementById('shareLink');
+      const shareStatus = document.getElementById('shareStatus');
 
       openLink.setAttribute('href', deepLink);
       deepLinkText.textContent = deepLink;
 
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(deepLink)}`;
-      qrImage.setAttribute('src', qrUrl);
+      if (!token) {
+        copyStatus.textContent = 'Missing invite token in URL.';
+      }
 
       copyButton.addEventListener('click', async () => {
         try {
@@ -65,6 +74,19 @@
           copyStatus.textContent = 'Copied.';
         } catch {
           copyStatus.textContent = 'Copy failed. Please copy from the text above.';
+        }
+      });
+
+      shareButton.addEventListener('click', async () => {
+        if (!navigator.share) {
+          shareStatus.textContent = 'Share is not available on this device.';
+          return;
+        }
+        try {
+          await navigator.share({ title: 'Echomitter invite', text: deepLink });
+          shareStatus.textContent = 'Shared.';
+        } catch {
+          shareStatus.textContent = 'Share cancelled.';
         }
       });
     })();
