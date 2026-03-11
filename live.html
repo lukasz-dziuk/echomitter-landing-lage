@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <title>Echomitter Live</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+  <style>
+    :root {
+      --bg-1: #020617;
+      --bg-2: #111827;
+      --line: #1f2937;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #ef4444;
+      --accent-2: #f97316;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1000px 600px at 100% -10%, rgba(239, 68, 68, 0.12), transparent 70%),
+        radial-gradient(800px 500px at -10% 100%, rgba(249, 115, 22, 0.1), transparent 70%),
+        linear-gradient(180deg, var(--bg-2), var(--bg-1));
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+    .status {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(2, 6, 23, 0.72);
+      backdrop-filter: blur(8px);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (min-width: 900px) {
+      .grid {
+        grid-template-columns: 1.2fr 1fr;
+      }
+    }
+    .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+    .value {
+      font-size: 14px;
+      word-break: break-all;
+      line-height: 1.5;
+    }
+    .video-shell {
+      position: relative;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      overflow: hidden;
+      background: #000;
+      aspect-ratio: 16 / 9;
+      box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+    }
+    .pill {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      background: rgba(15, 23, 42, 0.8);
+      color: #fecaca;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      animation: pulse 1.6s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.8); opacity: 0.55; }
+      50% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(0.8); opacity: 0.55; }
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    button {
+      border: 1px solid var(--line);
+      background: #0b1220;
+      color: var(--text);
+      font-weight: 600;
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+    button.primary {
+      border-color: rgba(239, 68, 68, 0.5);
+      background: linear-gradient(90deg, #dc2626, #ea580c);
+    }
+    .help {
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="top">
+      <div class="logo">Echomitter Live Viewer</div>
+      <div id="status" class="status">Inicjalizacja...</div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <div class="label">Manifest URL</div>
+        <div id="manifestUrl" class="value"></div>
+        <div class="actions">
+          <button id="copyManifest">Kopiuj manifest</button>
+          <button id="copyPageLink">Kopiuj link strony</button>
+          <button id="reloadPlayer" class="primary">Przeładuj stream</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="label">Parametry</div>
+        <div id="meta" class="value"></div>
+        <div class="help">
+          Wymagane query params: <code>userId</code> i <code>sessionId</code>.
+          Opcjonalne: <code>bucket</code> i <code>region</code>.
+        </div>
+      </div>
+    </section>
+
+    <section class="video-shell">
+      <div class="pill"><span class="dot"></span>LIVE</div>
+      <video id="video" playsinline controls autoplay muted></video>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const statusEl = document.getElementById('status');
+      const manifestUrlEl = document.getElementById('manifestUrl');
+      const metaEl = document.getElementById('meta');
+      const video = document.getElementById('video');
+      const copyManifestBtn = document.getElementById('copyManifest');
+      const copyPageLinkBtn = document.getElementById('copyPageLink');
+      const reloadBtn = document.getElementById('reloadPlayer');
+
+      const qs = new URLSearchParams(window.location.search);
+      const userId = qs.get('userId') || qs.get('user_id') || '';
+      const sessionId = qs.get('sessionId') || qs.get('session_id') || '';
+      const bucket = qs.get('bucket') || 'echomitter-media-production';
+      const region = qs.get('region') || 'eu-central-1';
+
+      const missing = [];
+      if (!userId) missing.push('userId');
+      if (!sessionId) missing.push('sessionId');
+
+      const manifestUrl = missing.length
+        ? ''
+        : `https://${bucket}.s3.${region}.amazonaws.com/recordings/${encodeURIComponent(userId)}/${encodeURIComponent(sessionId)}/video/hls/stream.m3u8`;
+
+      manifestUrlEl.textContent = manifestUrl || 'Brak wymaganych parametrów w URL';
+      metaEl.textContent = `userId=${userId || '-'} | sessionId=${sessionId || '-'} | bucket=${bucket} | region=${region}`;
+
+      let hls = null;
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      function stopPlayer() {
+        if (hls) {
+          hls.destroy();
+          hls = null;
+        }
+        video.removeAttribute('src');
+      }
+
+      async function startPlayer() {
+        if (!manifestUrl) {
+          setStatus(`Brak parametrów: ${missing.join(', ')}`);
+          return;
+        }
+
+        stopPlayer();
+        setStatus('Ładowanie streamu...');
+
+        if (window.Hls && window.Hls.isSupported()) {
+          hls = new Hls({
+            lowLatencyMode: true,
+            backBufferLength: 30,
+            maxLiveSyncPlaybackRate: 1.1
+          });
+          hls.loadSource(manifestUrl);
+          hls.attachMedia(video);
+          hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            video.play().catch(function () {});
+            setStatus('Odtwarzanie przez hls.js');
+          });
+          hls.on(Hls.Events.ERROR, function (_evt, data) {
+            if (data && data.fatal) {
+              setStatus(`Błąd streamu: ${data.type || 'fatal'}`);
+            }
+          });
+          return;
+        }
+
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = manifestUrl;
+          video.addEventListener('loadedmetadata', function onLoaded() {
+            video.removeEventListener('loadedmetadata', onLoaded);
+            video.play().catch(function () {});
+            setStatus('Odtwarzanie natywne HLS');
+          });
+          return;
+        }
+
+        setStatus('Ta przeglądarka nie obsługuje HLS');
+      }
+
+      copyManifestBtn.addEventListener('click', async function () {
+        if (!manifestUrl) return;
+        try {
+          await navigator.clipboard.writeText(manifestUrl);
+          setStatus('Skopiowano manifest URL');
+        } catch {
+          setStatus('Nie udało się skopiować manifest URL');
+        }
+      });
+
+      copyPageLinkBtn.addEventListener('click', async function () {
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          setStatus('Skopiowano link strony');
+        } catch {
+          setStatus('Nie udało się skopiować linku strony');
+        }
+      });
+
+      reloadBtn.addEventListener('click', function () {
+        startPlayer();
+      });
+
+      startPlayer();
+    })();
+  </script>
+</body>
+</html>
