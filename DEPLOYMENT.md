@@ -31,13 +31,13 @@ Set these secrets in `echomitter-landing-page` repo:
 - Workflow `.github/workflows/deploy.yml` runs automatically
 - It uploads:
   - `index.html`
-  - `invite-warden.html`
+  - `live.html`
 - It invalidates CloudFront paths:
   - `/index.html`
-  - `/invite-warden`
-  - `/invite-warden.html`
+  - `/live`
+  - `/live.html`
 
 ## Notes
 
-- CloudFront Function in infra rewrites extensionless paths (`/invite-warden` -> `/invite-warden.html`).
+- CloudFront Function in infra rewrites extensionless paths (e.g. `/live` -> `/live.html`).
 - HTML files are uploaded with `no-store` cache-control.
