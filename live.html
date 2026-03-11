@@ -112,12 +112,21 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
     }
+    .pill.dvr {
+      border-color: rgba(59, 130, 246, 0.45);
+      color: #bfdbfe;
+    }
     .dot {
       width: 8px;
       height: 8px;
       border-radius: 999px;
       background: var(--accent);
       animation: pulse 1.6s infinite;
+    }
+    .dot.dvr {
+      background: #3b82f6;
+      animation: none;
+      opacity: 0.95;
     }
     @keyframes pulse {
       0% { transform: scale(0.8); opacity: 0.55; }
@@ -165,6 +174,7 @@
         <div class="actions">
           <button id="copyManifest">Kopiuj manifest</button>
           <button id="copyPageLink">Kopiuj link strony</button>
+          <button id="jumpLive">Skocz do LIVE</button>
           <button id="reloadPlayer" class="primary">Przeładuj stream</button>
         </div>
       </div>
@@ -179,7 +189,7 @@
     </section>
 
     <section class="video-shell">
-      <div class="pill"><span class="dot"></span>LIVE</div>
+      <div id="modePill" class="pill"><span id="modeDot" class="dot"></span><span id="modeText">LIVE</span></div>
       <video id="video" playsinline controls autoplay muted></video>
     </section>
   </main>
@@ -190,9 +200,13 @@
       const manifestUrlEl = document.getElementById('manifestUrl');
       const metaEl = document.getElementById('meta');
       const video = document.getElementById('video');
+      const modePill = document.getElementById('modePill');
+      const modeDot = document.getElementById('modeDot');
+      const modeText = document.getElementById('modeText');
       const copyManifestBtn = document.getElementById('copyManifest');
       const copyPageLinkBtn = document.getElementById('copyPageLink');
       const reloadBtn = document.getElementById('reloadPlayer');
+      const jumpLiveBtn = document.getElementById('jumpLive');
 
       const qs = new URLSearchParams(window.location.search);
       const userId = qs.get('userId') || qs.get('user_id') || '';
@@ -212,9 +226,49 @@
       metaEl.textContent = `userId=${userId || '-'} | sessionId=${sessionId || '-'} | bucket=${bucket} | region=${region}`;
 
       let hls = null;
+      const LIVE_EDGE_THRESHOLD_SECONDS = 4;
 
       function setStatus(text) {
         statusEl.textContent = text;
+      }
+
+      function getLiveEdgeDistanceSeconds() {
+        const seekable = video.seekable;
+        if (!seekable || seekable.length === 0 || !Number.isFinite(video.currentTime)) {
+          return null;
+        }
+        const liveEdge = seekable.end(seekable.length - 1);
+        if (!Number.isFinite(liveEdge)) {
+          return null;
+        }
+        return Math.max(0, liveEdge - video.currentTime);
+      }
+
+      function updatePlaybackModeBadge() {
+        const distance = getLiveEdgeDistanceSeconds();
+        const isDvr = distance != null && distance > LIVE_EDGE_THRESHOLD_SECONDS;
+        if (isDvr) {
+          modeText.textContent = 'DVR';
+          modePill.classList.add('dvr');
+          modeDot.classList.add('dvr');
+        } else {
+          modeText.textContent = 'LIVE';
+          modePill.classList.remove('dvr');
+          modeDot.classList.remove('dvr');
+        }
+      }
+
+      function jumpToLiveEdge() {
+        const seekable = video.seekable;
+        if (!seekable || seekable.length === 0) {
+          return;
+        }
+        const liveEdge = seekable.end(seekable.length - 1);
+        if (Number.isFinite(liveEdge)) {
+          video.currentTime = Math.max(0, liveEdge - 0.2);
+          video.play().catch(function () {});
+          updatePlaybackModeBadge();
+        }
       }
 
       function stopPlayer() {
@@ -223,6 +277,9 @@
           hls = null;
         }
         video.removeAttribute('src');
+        modeText.textContent = 'LIVE';
+        modePill.classList.remove('dvr');
+        modeDot.classList.remove('dvr');
       }
 
       async function startPlayer() {
@@ -245,7 +302,10 @@
           hls.on(Hls.Events.MANIFEST_PARSED, function () {
             video.play().catch(function () {});
             setStatus('Odtwarzanie przez hls.js');
+            updatePlaybackModeBadge();
           });
+          hls.on(Hls.Events.LEVEL_UPDATED, updatePlaybackModeBadge);
+          hls.on(Hls.Events.FRAG_BUFFERED, updatePlaybackModeBadge);
           hls.on(Hls.Events.ERROR, function (_evt, data) {
             if (data && data.fatal) {
               setStatus(`Błąd streamu: ${data.type || 'fatal'}`);
@@ -260,6 +320,7 @@
             video.removeEventListener('loadedmetadata', onLoaded);
             video.play().catch(function () {});
             setStatus('Odtwarzanie natywne HLS');
+            updatePlaybackModeBadge();
           });
           return;
         }
@@ -289,6 +350,12 @@
       reloadBtn.addEventListener('click', function () {
         startPlayer();
       });
+      jumpLiveBtn.addEventListener('click', function () {
+        jumpToLiveEdge();
+      });
+      video.addEventListener('timeupdate', updatePlaybackModeBadge);
+      video.addEventListener('seeked', updatePlaybackModeBadge);
+      video.addEventListener('loadeddata', updatePlaybackModeBadge);
 
       startPlayer();
     })();
